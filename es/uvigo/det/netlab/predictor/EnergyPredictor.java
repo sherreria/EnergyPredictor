@@ -171,7 +171,7 @@ public final class EnergyPredictor
 			predictionStep = timeslotStep;
 		    }
 		} else if (line_fields[0].equals("PREDICTOR") && line_fields.length > 1) {
-		    if (line_fields[1].matches("dumb|pro-energy|pro-energy-vlt|ipro-energy|dwcma|udwcma|saa|saa-sine")) {
+		    if (line_fields[1].matches("dumb|pro-energy|pro-energy-vlt|ipro-energy|dwcma|udwcma|saa|saa-sine|wep")) {
 			predictorMode = line_fields[1];
 		    } else {
                         printError("Config file: invalid predictor mode!");
@@ -226,6 +226,18 @@ public final class EnergyPredictor
 			    }
 			    if (seriesDegree < 0 || seriesDegree > 13) {
 				printError("Config file: invalid degree for Taylor/Chebyshev series!");
+			    }
+			}
+		    }
+		    if (predictorMode.equals("wep")) {
+			if (line_fields.length > 2) {
+			    try {
+				timeslotWindow = Integer.parseInt(line_fields[2]);
+			    } catch (NumberFormatException e) {
+				printError("Config file: invalid timeslot window!");
+			    }
+			    if (timeslotWindow < 1) {
+				printError("Config file: invalid timeslot window!");
 			    }
 			}
 		    }
@@ -367,6 +379,8 @@ public final class EnergyPredictor
 		}
 	    } else if (predictorMode.matches("saa|saa-sine")) {
 		predictor = new SaaPredictorModule(challengeList, similarList, accurateSaaModel, seriesDegree);
+	    } else if (predictorMode.equals("wep")) {
+		predictor = new WepPredictorModule(challengeList, similarList, timeslotWindow);
 	    }
 	    int horizonTimeslot = t + predictionHorizon;
 	    if (horizonTimeslot > finalTimeslot) {
