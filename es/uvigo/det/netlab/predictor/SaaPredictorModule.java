@@ -80,20 +80,20 @@ public class SaaPredictorModule extends PredictorModule
 	    float cosDeclAngle = TrigTools.cos(declAngle);
 	    float initHourAngle = TrigTools.PI / 12 * (initEntryTimeslot - noonTimeslot) * hourFactor;
 	    float initAngle = TrigTools.asin(sinDeclAngle * sinLatAngle + cosDeclAngle * cosLatAngle * TrigTools.cos(initHourAngle));
-	    if (initAngle < 0) {
-		predictedValue = 0.0;
-	    } else {
+	    if (initAngle > 0.01745) { // 1 degree
 		float pastHourAngle = TrigTools.PI / 12 * (pastEntryTimeslot - noonTimeslot) * hourFactor;
 		float pastAngle = TrigTools.asin(sinDeclAngle * sinLatAngle + cosDeclAngle * cosLatAngle * TrigTools.cos(pastHourAngle));
 		predictedValue = initEntryValue * pastAngle / initAngle;
 	    }
 	} else {
 	    float initSin = TrigTools.sin(TrigTools.PI * (initEntryTimeslot - sunriseTimeslot) / (sunsetTimeslot - sunriseTimeslot));
-	    float pastSin = TrigTools.sin(TrigTools.PI * (pastEntryTimeslot - sunriseTimeslot) / (sunsetTimeslot - sunriseTimeslot));
-	    predictedValue = initEntryValue * pastSin / initSin;
+	    if (initSin > 0.01745) { // 1 degree
+		float pastSin = TrigTools.sin(TrigTools.PI * (pastEntryTimeslot - sunriseTimeslot) / (sunsetTimeslot - sunriseTimeslot));
+		predictedValue = initEntryValue * pastSin / initSin;
+	    }
 	}
-	if (predictedValue < 0) {
-	    predictedValue = 0.0;
+	if (predictedValue <= 0) {
+	    predictedValue = initEntryValue;
 	}
 	return predictedValue;
     } 
