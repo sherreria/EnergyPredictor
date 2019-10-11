@@ -39,20 +39,21 @@ public class WepPredictorModule extends PredictorModule
     {
 	super(currentData, pastData);
 	this.slotWindow = slotWindow;
-	errorAdjustment = true;
+	errorAdjustment = false;
 	pastPredictions = new double[currentData.size()];
 	pastErrors = new double[currentData.size()];
     }
     
     /**
-     * Returns the data value predicted for the next timeslot.
+     * Returns the data value predicted for the given timeslot index.
      *
+     * @param  index        the timeslot index
      * @param  currentIndex the current timeslot index
-     * @return the data value predicted for the next timeslot
+     * @return the data value predicted for the given timeslot index
      */
-    private double computePrediction (int currentIndex)
+    private double computePrediction (int index, int currentIndex)
     {
-	int firstIndex = currentIndex - slotWindow + 1;
+	int firstIndex = index - slotWindow + 1;
 	if (firstIndex < 1) {
 	    firstIndex = 1;
 	}
@@ -60,15 +61,16 @@ public class WepPredictorModule extends PredictorModule
 	int sumWeights = 0;
 	double sumValues = 0.0;
 	double sumErrors = 0.0;
-	for (int index = firstIndex; index <= currentIndex; index++) {
-	    sumValues += weight * currentData.getEntryByIndex(index).getValue();
+	for (int i = firstIndex; i <= index; i++) {
+	    double value = i > currentIndex ? pastPredictions[i - 1] : currentData.getEntryByIndex(i).getValue();
+	    sumValues += weight * value;
 	    sumWeights += weight;
-	    sumErrors += pastErrors[index - 1];
+	    sumErrors += pastErrors[i - 1];
 	    weight++;
 	}
 	double prediction = sumValues / sumWeights;
 	if (errorAdjustment) {
-	    prediction += sumErrors / (currentIndex - firstIndex + 1);
+	    prediction += sumErrors / (index - firstIndex + 1);
 	}
 	return prediction;
     }
@@ -83,11 +85,12 @@ public class WepPredictorModule extends PredictorModule
     public double getPrediction (DataEntry initEntry, DataEntry pastEntry)
     {
 	int initIndex = currentData.getIndexByTimeslot(initEntry.getTimeslot());
+	int pastIndex = currentData.getIndexByTimeslot(pastEntry.getTimeslot());
 	int firstIndex = errorAdjustment ? 1 : initIndex;
-	for (int index = firstIndex; index <= initIndex; index++) {
-	    pastPredictions[index] = computePrediction(index);
-	    pastErrors[index] = currentData.getEntryByIndex(index + 1).getValue() - pastPredictions[index];
+	for (int index = firstIndex; index < pastIndex; index++) {
+	    pastPredictions[index] = computePrediction(index, initIndex);
+	    pastErrors[index] = index >= initIndex ? 0.0 : currentData.getEntryByIndex(index + 1).getValue() - pastPredictions[index];
 	}
-	return pastPredictions[initIndex];
-    } 
+	return pastPredictions[pastIndex - 1];
+    }
 }
