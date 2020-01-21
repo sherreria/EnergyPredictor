@@ -1,0 +1,7 @@
+Oak Ridge National Laboratory (RSR)
+
+Any publication based in whole or in part on these data sets should cite the data source as:
+
+Maxey, C.; Andreas, A.; (2007). Oak Ridge National Laboratory (ORNL); Rotating Shadowband
+Radiometer (RSR); Oak Ridge, Tennessee (Data); NREL Report No. DA-5500-56512.
+http://dx.doi.org/10.5439/1052553 
