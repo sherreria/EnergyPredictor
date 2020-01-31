@@ -26,32 +26,40 @@ public class SaaPredictorModule extends PredictorModule
     private int noonTimeslot;
 
     /**
-     * Use accurate model if true
+     * Use exact solar model if true
      */
-    private boolean accurateModel;
+    private boolean exactSolarModel;
    
     /**
      * Factor used to compute the hour angle
      */
     private float hourFactor;
+
+    /**
+     * Half the duration of a timeslot
+     */
+    private int halfTimeslot;
     
     /**
      * Creates a new SAA predictor module.
      *
      * @param currentData   the data list with current observations
      * @param pastData      the data list with past observations
-     * @param accurateModel use accurate solar model to make predictions if true
+     * @param exactModel    use exact solar model to make predictions if true
      * @param seriesDegree  the degree of the Taylor/Chebyshev series used to approximate trigonometric functions
      */
-    public SaaPredictorModule (DataList currentData, DataList pastData, boolean accurateModel, int seriesDegree)
+    public SaaPredictorModule (DataList currentData, DataList pastData, boolean exactModel, int seriesDegree)
     {
 	super(currentData, pastData);
 	sunriseTimeslot = ((SolarDataList) currentData).sunriseTimeslot();
 	sunsetTimeslot = ((SolarDataList) currentData).sunsetTimeslot();
 	noonTimeslot = ((SolarDataList) currentData).noonTimeslot();
-	this.accurateModel = accurateModel;
-	hourFactor = accurateModel ? 24f / currentData.getEntryByIndex(currentData.size() - 1).getTimeslot() : 0;
+	exactSolarModel = exactModel;
 	TrigTools.seriesDegree = seriesDegree;
+	int currentDataSize = currentData.size();
+	int lastEntryTimeslot = currentData.getEntryByIndex(currentDataSize - 1).getTimeslot();
+	hourFactor = 24f / lastEntryTimeslot;
+	halfTimeslot = lastEntryTimeslot / currentDataSize / 2;
     }
     
     /**
@@ -65,35 +73,32 @@ public class SaaPredictorModule extends PredictorModule
     {
 	double predictedValue = 0.0;
 	double initEntryValue = initEntry.getValue();
-	int initEntryTimeslot = initEntry.getTimeslot();
-	int pastEntryTimeslot = pastEntry.getTimeslot();
+	int initEntryTimeslot = initEntry.getTimeslot() - halfTimeslot;
+	int pastEntryTimeslot = pastEntry.getTimeslot() - halfTimeslot;
 
-	if (accurateModel) {
+	if (exactSolarModel) {
 	    Calendar calendar = Calendar.getInstance();
 	    calendar.setTime(currentData.getDate());
 	    int dayofyear = calendar.get(Calendar.DAY_OF_YEAR);
 	    float latAngle = (float) ((SolarDataList) currentData).latitude() * TrigTools.PI / 180;
 	    float sinLatAngle = TrigTools.sin(latAngle);
 	    float cosLatAngle = TrigTools.cos(latAngle);
-	    float declAngle = -0.4092797f * TrigTools.cos((dayofyear + 10) * 2 * TrigTools.PI / 365);
+	    float declAngle = -0.40928f * TrigTools.cos((dayofyear + 10) * 2 * TrigTools.PI / 365);
 	    float sinDeclAngle = TrigTools.sin(declAngle);
 	    float cosDeclAngle = TrigTools.cos(declAngle);
 	    float initHourAngle = TrigTools.PI / 12 * (initEntryTimeslot - noonTimeslot) * hourFactor;
 	    float initAngle = TrigTools.asin(sinDeclAngle * sinLatAngle + cosDeclAngle * cosLatAngle * TrigTools.cos(initHourAngle));
-	    if (initAngle > 0.01745) { // 1 degree
+	    if (initAngle > 0.00873) { // 0.5 degree
 		float pastHourAngle = TrigTools.PI / 12 * (pastEntryTimeslot - noonTimeslot) * hourFactor;
 		float pastAngle = TrigTools.asin(sinDeclAngle * sinLatAngle + cosDeclAngle * cosLatAngle * TrigTools.cos(pastHourAngle));
 		predictedValue = initEntryValue * pastAngle / initAngle;
 	    }
 	} else {
 	    float initSin = TrigTools.sin(TrigTools.PI * (initEntryTimeslot - sunriseTimeslot) / (sunsetTimeslot - sunriseTimeslot));
-	    if (initSin > 0.01745) { // 1 degree
+	    if (initSin > 0.00873) { // 0.5 degree
 		float pastSin = TrigTools.sin(TrigTools.PI * (pastEntryTimeslot - sunriseTimeslot) / (sunsetTimeslot - sunriseTimeslot));
 		predictedValue = initEntryValue * pastSin / initSin;
 	    }
-	}
-	if (predictedValue <= 0) {
-	    predictedValue = initEntryValue;
 	}
 	return predictedValue;
     } 
