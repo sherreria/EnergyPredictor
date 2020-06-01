@@ -280,10 +280,10 @@ public class DataList
 	if (finalTimeslot <= initialTimeslot) {
 	    return 0.0;
 	}
-	int index = getIndexByTimeslot(initialTimeslot);
-	DataEntry currEntry, prevEntry = getEntryByIndex(index);
-	double currValue, prevValue = prevEntry.getValue();
-	int currTimeslot, prevTimeslot = prevEntry.getTimeslot();
+	int index = initialTimeslot == 0 ? -1 : getIndexByTimeslot(initialTimeslot);
+	DataEntry currEntry, prevEntry = initialTimeslot == 0 ? null : getEntryByIndex(index);
+	double currValue, prevValue = initialTimeslot == 0 ? 0 : prevEntry.getValue();
+	int currTimeslot, prevTimeslot = initialTimeslot == 0 ? 0 : prevEntry.getTimeslot();
 	double energy = 0.0;
 	while (prevTimeslot < finalTimeslot) {
 	    currEntry = getEntryByIndex(index + 1);
