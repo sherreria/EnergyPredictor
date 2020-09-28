@@ -72,8 +72,10 @@ public final class EnergyPredictor
 	int numPreviousDays = 0;
 	double weightingFactor = 0.5;
 	double correlationFactor = 0;
-	boolean accurateSaaModel = false;
+	boolean exactSaaModel = false;
 	int seriesDegree = 0;
+	double[] arCoef = null;
+	double[] maCoef = null;
 	
 	// Arguments parsing
 	if (args.length < 1) {
@@ -171,7 +173,7 @@ public final class EnergyPredictor
 			predictionStep = timeslotStep;
 		    }
 		} else if (line_fields[0].equals("PREDICTOR") && line_fields.length > 1) {
-		    if (line_fields[1].matches("dumb|pro-energy|pro-energy-vlt|ipro-energy|dwcma|udwcma|saa|saa-sine|wep")) {
+		    if (line_fields[1].matches("dumb|pro-energy|pro-energy-vlt|ipro-energy|dwcma|udwcma|saa|saa-sine|wep|arma|dynar")) {
 			predictorMode = line_fields[1];
 		    } else {
                         printError("Config file: invalid predictor mode!");
@@ -216,7 +218,7 @@ public final class EnergyPredictor
 		    }
 		    if (predictorMode.matches("saa|saa-sine")) {
 			if (predictorMode.equals("saa")) {
-			    accurateSaaModel = true;
+			    exactSaaModel = true;
 			}
 			if (line_fields.length > 2) {
 			    try {
@@ -238,6 +240,22 @@ public final class EnergyPredictor
 			    }
 			    if (timeslotWindow < 1) {
 				printError("Config file: invalid timeslot window!");
+			    }
+			}
+		    }
+		    if (predictorMode.equals("arma")) {
+			if (line_fields.length > 3) {
+			    String[] arCoefStr = line_fields[2].split(",");
+			    try {
+				arCoef = Arrays.stream(arCoefStr).mapToDouble(Double::parseDouble).toArray();
+			    } catch (NumberFormatException e) {
+				printError("Config file: invalid autoregressive parameter!");
+			    }	
+			    String[] maCoefStr = line_fields[3].split(",");
+			    try {
+				maCoef = Arrays.stream(maCoefStr).mapToDouble(Double::parseDouble).toArray();
+			    } catch (NumberFormatException e) {
+				printError("Config file: invalid moving average parameter!");
 			    }
 			}
 		    }
@@ -268,7 +286,7 @@ public final class EnergyPredictor
 	if (predictorMode.equals("pro-energy-vlt")) {
 	    challengeList.resize();
 	}
-	//challengeList.print();
+	challengeList.print();
 	if (solarTraces && initialTimeslot == 0 && finalTimeslot == 0) {
 	    initialTimeslot = timeslotStep * (int) (Math.round(((SolarDataList) challengeList).sunriseTimeslot() / (double) timeslotStep) + 1);
 	    finalTimeslot = timeslotStep * (int) Math.round(((SolarDataList) challengeList).sunsetTimeslot() / (double) timeslotStep);
@@ -378,10 +396,13 @@ public final class EnergyPredictor
 		    predictor = new UDwcmaPredictorModule(challengeList, similarList, udwcmaSimilarList, factorLists, t, timeslotWindow);
 		}
 	    } else if (predictorMode.matches("saa|saa-sine")) {
-		predictor = new SaaPredictorModule(challengeList, similarList, accurateSaaModel, seriesDegree);
+		predictor = new SaaPredictorModule(challengeList, similarList, exactSaaModel, seriesDegree);
 	    } else if (predictorMode.equals("wep")) {
 		predictor = new WepPredictorModule(challengeList, similarList, timeslotWindow);
+	    } else if (predictorMode.equals("arma")) {
+		predictor = new ArmaPredictorModule(challengeList, similarList, arCoef, maCoef);
 	    }
+	    
 	    int horizonTimeslot = t + predictionHorizon;
 	    if (horizonTimeslot > finalTimeslot) {
 		horizonTimeslot = finalTimeslot;
@@ -396,7 +417,7 @@ public final class EnergyPredictor
 		int accPredictionsIndex = (t - initialTimeslot) / timeslotStep;
 		accPredictionsList[accPredictionsIndex] = new DataList(t + "-predictions.acc", null);
 		for (int horizon = t + predictionStep; horizon <= t + predictionHorizon && horizon <= finalTimeslot; horizon += predictionStep) {
-		    accPredictionsList[accPredictionsIndex].addEntry(predictions.getEnergyHarvested(t, horizon, powerFactor), horizon);
+		    accPredictionsList[accPredictionsIndex].addEntry(predictions.getEnergyHarvested(t, horizon, powerFactor) * predictionStep / timeslotStep, horizon);
 		}
 		//accPredictionsList[accPredictionsIndex].print();
 	    }
@@ -442,6 +463,10 @@ public final class EnergyPredictor
 		}
 		predictionValue = predictionEntry.getValue();
 		challengeValue = challengeEntry.getValue();
+		if (!accPredictions && !energyTraces) {
+		    predictionValue *= powerFactor * timeslotStep;
+		    challengeValue *= powerFactor * timeslotStep;
+		}
 		sumChallengeValue += challengeValue;
 		absError = Math.abs(challengeValue - predictionValue);
 		sumAbsError += absError;
