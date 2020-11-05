@@ -173,7 +173,7 @@ public final class EnergyPredictor
 			predictionStep = timeslotStep;
 		    }
 		} else if (line_fields[0].equals("PREDICTOR") && line_fields.length > 1) {
-		    if (line_fields[1].matches("dumb|pro-energy|pro-energy-vlt|ipro-energy|dwcma|udwcma|saa|saa-sine|wep|arma|dynar")) {
+		    if (line_fields[1].matches("dumb|pro-energy|pro-energy-vlt|ipro-energy|dwcma|udwcma|saa|saa-sine|wep|arma|ewma")) {
 			predictorMode = line_fields[1];
 		    } else {
                         printError("Config file: invalid predictor mode!");
@@ -256,6 +256,23 @@ public final class EnergyPredictor
 				maCoef = Arrays.stream(maCoefStr).mapToDouble(Double::parseDouble).toArray();
 			    } catch (NumberFormatException e) {
 				printError("Config file: invalid moving average parameter!");
+			    }
+			}
+		    }
+		    if (predictorMode.equals("ewma")) {
+			analyzerMode = "average";
+			if (line_fields.length > 3) {
+			    try {
+				numPreviousDays = Integer.parseInt(line_fields[2]);
+				weightingFactor = Double.parseDouble(line_fields[3]);
+			    } catch (NumberFormatException e) {
+				printError("Config file: invalid " + predictorMode + " predictor configuration!");
+			    }
+			    if (numPreviousDays <= 0) {
+				printError("Config file: invalid number of previous trace files!");
+			    }
+			    if (weightingFactor < 0 || weightingFactor > 1) {
+				printError("Config file: invalid weighting factor!");
 			    }
 			}
 		    }
@@ -401,6 +418,8 @@ public final class EnergyPredictor
 		predictor = new WepPredictorModule(challengeList, similarList, timeslotWindow);
 	    } else if (predictorMode.equals("arma")) {
 		predictor = new ArmaPredictorModule(challengeList, similarList, arCoef, maCoef);
+	    } else if (predictorMode.equals("ewma")) {
+		predictor = new EwmaPredictorModule(challengeList, similarList, weightingFactor);
 	    }
 	    
 	    int horizonTimeslot = t + predictionHorizon;
